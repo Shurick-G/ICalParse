@@ -1,4 +1,7 @@
 import requests
+import pandas as pd
+import requests
+from datetime import datetime
 
 def event_field_parce(row, is_it_event, dictionary):
     '''
@@ -70,3 +73,36 @@ def get_cal(url):
         return events
     else:
         print('Response code:', response.status_code() )
+
+def open_cals_file(path_to_file):
+    cals_dict = {}
+    with open(path_to_file, 'r', encoding='utf-8' ) as cals_txt:
+        for line in cals_txt:
+            key, value = line.split('$')
+            cals_dict[key] = value
+
+        for cal, url in cals_dict.items():
+            cals_dict[cal] = url.replace('\n', '')
+
+    return cals_dict
+
+def create_schedule(cal, st, end):
+
+    # Переводим словарь в DataFram, так будет проще работать
+    df = pd.DataFrame(cal)
+    df.columns = map(str.lower, df.columns)
+
+    # Если строка поле 'dtstart'содержат VALUE, то это не события, а задачи.
+    # А задачи нам пока не нужны
+    df = df[~df['dtstart'].str.contains('VALUE')]
+
+    for col in ['dtstart', 'dtend']:
+        # Т.к. некоторые даты имеют вид: 20150610T145500Z, а некоторые: TZID=Asia/Vladivostok:20150609T180000 или VALUE=DATE:20150614
+        # Приведём всё к одному виду, отрезав лишнее (лишнее то, что до ':')
+        df[f'{col}'] = df[f'{col}'].apply(lambda x:  x.split(':')[1] if len(x.split(':'))>1 else x )
+        df[f'{col}'] = df[f'{col}'].str.replace('Z', '')
+        df[f'{col}'] = pd.to_datetime(df[f'{col}'], format='%Y%m%dT%H%M%S')
+
+    df['duration'] = (df['dtend'] - df['dtstart']).apply(lambda x: x.seconds / 3600)
+    return df[ (df['dtstart'] >= st) & (df['dtend'] <= end) ]
+
