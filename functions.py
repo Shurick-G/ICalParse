@@ -154,22 +154,14 @@ def rule_to_dict(rule):
     return rule_dict
 
 
-def make_row_by_day(e, temp_bord, day):
-
-    rule_bord = temp_bord.query(f" dayofweek == {day}")
-
+def make_row_by_day(e, rule_bord, days):
+    # rule_bord = bord.query(f" dayofweek in {days}")
     for field in e.index:
         rule_bord[field] = e[field]
 
     return rule_bord
 
-def make_row_by_working_day(e, temp_bord):
-    rule_bord = temp_bord.query(f" dayofweek in (0, 1, 2, 3, 4)")
 
-    for field in e.index:
-        rule_bord[field] = e[field]
-
-    return rule_bord
 
 
 def events_by_rules(df, st, end):
@@ -185,71 +177,75 @@ def events_by_rules(df, st, end):
     bord['month'] = bord['timeline'].dt.month
     bord['day'] = bord['timeline'].dt.day
 
-    # for e in df.iterrows():
-    #     if e
-    # !!!!! Не забудь пределать df.loc[4]. См. две закомментированные строки выше
-    e = df.iloc[4, :] # event
-    rule = e['rrule']
+    rules_schedule = pd.DataFrame()
 
-    temp_st = dt.datetime.combine(e['st_date'], dt.time.min) # Both datetime.time() and datetime.time.min represent midnight (00:00:00).
+    for index, e in df.iterrows():
 
-    # creating a Data Frame, in which we will add events created by the rule
-    rules_events = pd.DataFrame()
+        rule = e['rrule']
 
-    # Проверяем есть ли правило "UNTIL"
-    if 'UNTIL' in rule:
-        until = rule['UNTIL']
-        until = until.replace('Z', '')
-        until = dt.datetime.strptime(until, '%Y%m%dT%H%M%S')
+        # Since recurring events should not be created before the date of the main event, we will cut boar table
+        e_st = dt.datetime.combine(e['st_date'], dt.time.min) # Both datetime.time() and datetime.time.min represent midnight (00:00:00).
+        bord = bord[ bord['timeline'] >= e_st ]
 
-        # temp_bord = temp_bord[
-        #     (temp_bord['timeline'] >= temp_st)
-        #     &
-        #     (temp_bord['timeline'] < until)
-        #     ]
+        # creating a Data Frame, in which we will add events created by the rule
+        rules_events = pd.DataFrame()
 
-        bord = bord[
-            (bord['timeline'] >= temp_st)
-            &
-            (bord['timeline'] < until)
-            ]
+        # Проверяем есть ли правило "UNTIL"
+        if 'UNTIL' in rule:
+            until = rule['UNTIL']
+            until = until.replace('Z', '')
+            until = dt.datetime.strptime(until, '%Y%m%dT%H%M%S')
 
-    # Need comment
-    match rule['FREQ']:
-        case 'DAILY':
-            for field in e.index:
-                bord[field] = e[field]
+            bord = bord[ bord['timeline'] < until ]
 
-        case 'WEEKLY':
-            # check whether this rule is the rule of the working week
-            if 'WKST' in rule.keys():
-                row = make_row_by_working_day(e, bord)
-                bord = pd.concat([rules_events, row], axis=0)
-            else:
+        # Need comment
+        match rule['FREQ']:
+            case 'DAILY':
+                for field in e.index:
+
+                    bord[field] = e[field]
+                    row = bord
+
+            case 'WEEKLY':
+
                 rule['BYDAY'] = rule['BYDAY'].split(',')
 
-                if type( rule['BYDAY'] ) is list:
-                    for day in rule['BYDAY']:
+                days = ()
+                for day in rule['BYDAY']:
 
-                        row = make_row_by_day(e, bord, Week_days[day])
-                        rules_events = pd.concat([rules_events, row], axis=0)
+                    days = days + (Week_days[day],)
 
-                    return rules_events
+                rule_bord = bord.query(f" dayofweek in {days}")
 
-        case 'MONTHLY':
+                row = make_row_by_day(e, rule_bord, days)
+
+            case 'MONTHLY':
+                if 'BYDAY' in rule.keys():
+                    week = int( rule['BYDAY'][0] )
+                    days = ( Week_days[rule['BYDAY'][1:]], )
+
+                    rule_bord = bord.query(f"dayofweek in {days}")
+
+                    rule_bord = rule_bord.sort_values('timeline').reset_index()
+                    # rule_bord = rule_bord.iloc[week]
+                    #
+                    row = make_row_by_day(e, rule_bord, days)
 
 
+                if 'BYMONTHDAY' in rule.keys():
+                    days = ( int(rule['BYMONTHDAY']),)
+                    rule_bord = bord.query(f"day in {days}")
 
+                    row = make_row_by_day(e, rule_bord, days)
 
-
+        rules_schedule = pd.concat([rules_schedule, row], axis=0, ignore_index=True)
+        # rules_schedule = rules_schedule.sort_values('timeline').reset_index(drop=True)
 
     # Replace values in 'dtstart' and 'dtend' columns
 
     # Delete extr columns
 
-    return bord
+    return rules_schedule
 
 
-#%%
 
-#%%
