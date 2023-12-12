@@ -87,6 +87,10 @@ def parse_cal(cal):
 
 
 def dict_to_df(cal):
+    # if cal is empty, return empty DataFrame
+    if not cal:
+        return pd.DataFrame()
+
     # Переводим словарь в DataFrame, так будет проще работать
     df = pd.DataFrame(cal)
     # Понижаем символы в названии полей DataFrame'а
@@ -289,6 +293,10 @@ def events_by_rules(df, st, end):
 
 
 def create_schedule(cal, st, end):
+    # if cal is empty, return empty DataFrame
+    if not cal:
+        return pd.DataFrame()
+
     df = dict_to_df(cal)
 
     if 'rrule' in df.columns:
