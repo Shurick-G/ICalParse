@@ -1,4 +1,3 @@
-import requests
 import pandas as pd
 import requests
 import datetime as dt
@@ -299,12 +298,13 @@ def create_schedule(cal, st, end):
 
     df = dict_to_df(cal)
 
+
     if 'rrule' in df.columns:
         schedule_without_rules = df[df['rrule'].isna()]
         schedule_by_rules = events_by_rules(df, st, end)
 
         schedule = pd.concat([schedule_without_rules, schedule_by_rules], axis=0, ignore_index=True)
-
+    df = df[df['rrule'] == 'NaN']
     df = pd.concat([df, schedule], axis=0, ignore_index=True)
 
     df = df[
