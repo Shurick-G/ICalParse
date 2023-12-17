@@ -305,12 +305,13 @@ def create_schedule(cal, st, end):
 
         schedule = pd.concat([schedule_without_rules, schedule_by_rules], axis=0, ignore_index=True)
 
-        # Preparing the schedule for output
-        return drop_extra_cols( schedule )
+    df = pd.concat([df, schedule], axis=0, ignore_index=True)
 
     df = df[
-        df['dtstart'] >= st
+        (df['dtstart'] >= st)
         &
-        df['end'] <= end
+        (df['dtend'] <= end)
     ]
+
+
     return drop_extra_cols(df)
